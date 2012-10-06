@@ -46,13 +46,8 @@ let create () =
     ~code:(of_input |- Char.code)
     ~input:(Char.chr |- input_of)
 
-let enum datrie =
+let nodes datrie =
   BatDynArray.enum datrie.nodes
-
-let of_enum e = {
-  (create ()) with
-    nodes = BatDynArray.of_enum e
-}
 
 let report ?(printer=ignore) datrie =
   BatDynArray.iteri (fun i node ->

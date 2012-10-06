@@ -22,6 +22,8 @@ type ('key, 'input, 'value) t
 (** mutable double-array trie which key is 'a and inputs from 'a is 'b
     and record is 'c *)
 
+val nodes : ('key, 'input, 'value) t -> 'value node option BatEnum.t
+
 val make :
   enum:('key ->'input input BatEnum.t) ->
   all:(unit -> 'input input BatSet.t) ->
