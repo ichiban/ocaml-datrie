@@ -1,0 +1,14 @@
+*~
+\#*#
+_build/
+*.byte
+*.log
+*.annot
+*.cmo
+*.cma
+*.cmi
+*.a
+*.o
+*.cmx
+*.cmxs
+*.cmxa

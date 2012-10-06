@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: c5d2c551eb7cbb166f7f3ba139cf29d8)
+version = "0.0.0"
+description = "Double-Array Trie"
+requires = "batteries"
+archive(byte) = "datrie.cma"
+archive(byte, plugin) = "datrie.cma"
+archive(native) = "datrie.cmxa"
+archive(native, plugin) = "datrie.cmxs"
+exists_if = "datrie.cma"
+# OASIS_STOP
+
