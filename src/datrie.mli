@@ -13,8 +13,8 @@ type 'value base =
 (** type of base cell *)
 
 type 'value node = {
-  mutable base : 'value base;
-  mutable check : state;
+  base : 'value base;
+  check : state;
 }
 (** node *)
 

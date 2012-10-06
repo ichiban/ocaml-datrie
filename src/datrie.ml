@@ -14,8 +14,8 @@ type 'value base =
   | Value of 'value
 
 type 'value node = {
-  mutable base : 'value base;
-  mutable check : state;
+  base : 'value base;
+  check : state;
 }
 
 type ('key, 'input, 'value) t = {
@@ -73,20 +73,15 @@ let set_node datrie state node =
         ensure_index datrie i;
         BatDynArray.set datrie.nodes i node
 
-let with_base_and_check datrie f =
-  let base i = match (node datrie i) with
+let base datrie state =
+  match (node datrie state) with
     | None -> failwith "empty cell (base)"
-    | Some pair -> pair.base in
-  let check i = match (node datrie i) with
+    | Some node -> node.base
+
+let check datrie state =
+  match (node datrie state) with
     | None -> failwith "empty cell (check)"
-    | Some pair -> pair.check in
-  let set_base i base = match (node datrie i) with
-    | None -> failwith "empty cell (set_base)"
-    | Some pair -> pair.base <- base in
-  let set_check i check = match (node datrie i) with
-    | None -> failwith "empty cell (set_check)"
-    | Some pair -> pair.check <- check in
-  f base check set_base set_check
+    | Some node -> node.check
 
 let make ~enum ~all ~code ~input () = {
   nodes = BatDynArray.of_array [| Some { base = NextOffset (Offset 1); check = State 0 } |];
@@ -168,32 +163,37 @@ let next_offset datrie expected_inputs =
     | Not_found -> Offset length
 
 let resolve_conflict datrie prev_state input =
-  with_base_and_check datrie (fun base check set_base set_check ->
-    let old_transitions = transitions datrie prev_state in
-    let new_transitions =
-      BatSet.add input old_transitions in
-    let old_offset = match (base prev_state) with
-      | NextOffset offset ->
-          offset
-      | Value _ ->
-          failwith "prev_state must be a branch" in
-    let new_offset = next_offset datrie new_transitions in
-    BatSet.iter (fun input ->
-      set_node datrie (state datrie new_offset input) (Some {
-        base = base (state datrie old_offset input);
-        check = prev_state;
-      });
-      BatSet.iter (fun input' ->
-        match (base (state datrie old_offset input')) with
-          | NextOffset prev_offset ->
-             set_check (state datrie prev_offset input') (state datrie new_offset input)
-          | Value _ ->
-              failwith "state must be a branch"
-      ) (transitions datrie (state datrie old_offset input));
-      set_node datrie (state datrie old_offset input) None
-    ) old_transitions;
-    set_base prev_state (NextOffset new_offset)
-  )
+  let old_transitions = transitions datrie prev_state in
+  let new_transitions =
+    BatSet.add input old_transitions in
+  let old_offset = match (base datrie prev_state) with
+    | NextOffset offset ->
+        offset
+    | Value _ ->
+        failwith "prev_state must be a branch" in
+  let new_offset = next_offset datrie new_transitions in
+  BatSet.iter (fun input ->
+    set_node datrie (state datrie new_offset input) (Some {
+      base = base datrie (state datrie old_offset input);
+      check = prev_state;
+    });
+    BatSet.iter (fun input' ->
+      match (base datrie (state datrie old_offset input')) with
+        | NextOffset offset ->
+            let s = state datrie offset input' in
+            set_node datrie s (Some {
+              (BatOption.get (node datrie s)) with
+                check = state datrie new_offset input
+            })
+        | Value _ ->
+            failwith "state must be a branch"
+    ) (transitions datrie (state datrie old_offset input));
+    set_node datrie (state datrie old_offset input) None
+  ) old_transitions;
+  set_node datrie prev_state (Some {
+    (BatOption.get (node datrie prev_state)) with
+      base = NextOffset new_offset
+  })
 
 let ensure_next_node ?(inserting=true) ?(updating=true) datrie current_state input base =
   let rec aux () =
