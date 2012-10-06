@@ -26,6 +26,34 @@ type ('key, 'input, 'value) t = {
   input : int -> 'input input;
 }
 
+let make ~enum ~all ~code ~input () = {
+  nodes = BatDynArray.of_array [| Some { base = NextOffset (Offset 1); check = State 0 } |];
+  enum = enum;
+  all = all;
+  code = code;
+  input = input;
+}
+
+let input_of x = Input x
+
+let of_input = function
+  | Input x -> x
+
+let create () =
+  make ()
+    ~enum:(BatString.enum |- BatEnum.map input_of)
+    ~all:(BatChar.enum |- BatEnum.map input_of |- BatSet.of_enum)
+    ~code:(of_input |- Char.code)
+    ~input:(Char.chr |- input_of)
+
+let enum datrie =
+  BatDynArray.enum datrie.nodes
+
+let of_enum e = {
+  (create ()) with
+    nodes = BatDynArray.of_enum e
+}
+
 let report ?(printer=ignore) datrie =
   BatDynArray.iteri (fun i node ->
     print_int i;
@@ -82,26 +110,6 @@ let check datrie state =
   match (node datrie state) with
     | None -> failwith "empty cell (check)"
     | Some node -> node.check
-
-let make ~enum ~all ~code ~input () = {
-  nodes = BatDynArray.of_array [| Some { base = NextOffset (Offset 1); check = State 0 } |];
-  enum = enum;
-  all = all;
-  code = code;
-  input = input;
-}
-
-let input_of x = Input x
-
-let of_input = function
-  | Input x -> x
-
-let create () =
-  make ()
-    ~enum:(BatString.enum |- BatEnum.map input_of)
-    ~all:(BatChar.enum |- BatEnum.map input_of |- BatSet.of_enum)
-    ~code:(of_input |- Char.code)
-    ~input:(Char.chr |- input_of)
 
 let state datrie offset input =
   match offset with
