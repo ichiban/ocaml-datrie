@@ -1,30 +1,10 @@
 open BatPervasives
-open DatrieKey
 
-module type D =
-sig
-  type key
-
-  type 'a t
-
-  val create : unit -> 'a t
-
-  val set : 'a t -> key -> 'a -> unit
-    
-  val add : 'a t -> key -> 'a -> unit
-    
-  val update : 'a t -> key -> 'a -> unit
-
-  val get : 'a t -> key -> 'a option
-end
-
-module Make (Key : DatrieKey.Key) =
+module Make (Key : DatrieInterface.Key) =
 struct
-  type state =
-    | State of int
+  type state = State of int
 	
-  type offset =
-    | Offset of int
+  type offset = Offset of int
 
   type 'a base =
     | NextOffset of offset
@@ -40,6 +20,8 @@ struct
   type 'a t = {
     nodes : 'a node option BatDynArray.t;
   }
+
+  exception InvalidState of string
       
   let create () = {
     nodes = BatDynArray.of_array [| Some {
@@ -151,9 +133,10 @@ struct
         failwith "prev_state must be a branch" in
     let new_offset = next_offset datrie new_transitions in
     BatSet.iter (fun input ->
+      let old_state = state datrie old_offset input in
       set_node datrie (state datrie new_offset input) (Some {
-        base = base datrie (state datrie old_offset input);
-        check = prev_state;
+	(BatOption.get (node datrie old_state)) with
+          check = prev_state	  
       });
       BatSet.iter (fun input' ->
         match (base datrie (state datrie old_offset input')) with
@@ -165,8 +148,8 @@ struct
             })
           | Value _ ->
             failwith "state must be a branch"
-      ) (transitions datrie (state datrie old_offset input));
-      set_node datrie (state datrie old_offset input) None
+      ) (transitions datrie old_state);
+      set_node datrie old_state None
     ) old_transitions;
     set_node datrie prev_state (Some {
       (BatOption.get (node datrie prev_state)) with
@@ -181,11 +164,12 @@ struct
         | Some next_state ->
           (match (node datrie next_state) with
             | None ->
-              if inserting then
-                set_node datrie next_state (Some {
-                  base = base;
-                  check = current_state;
-                });
+              if not inserting then
+		raise (InvalidState "key exists");
+              set_node datrie next_state (Some {
+                base = base;
+                check = current_state;
+              });
               next_state
             | Some { base = _; check = check } when check <> current_state ->
               (* WARNING: collision detected *)
@@ -194,11 +178,12 @@ struct
             | Some { base = NextOffset _; check = _ } ->
               next_state
             | Some { base = Value _; check = _ } ->
-              if updating then
-                set_node datrie next_state (Some {
-                  base = base;
-                  check = current_state;
-                });
+              if not updating then
+		raise (InvalidState "key doesn't exist");
+              set_node datrie next_state (Some {
+                base = base;
+                check = current_state;
+              });
               next_state) in
     aux ()
 
@@ -263,7 +248,93 @@ struct
               iter next_state)
         | (Some { base = Value value; check = _ }, _) ->
           None in
-    iter (State 0)  
+    iter (State 0)
+
+  let path datrie key =
+    let inputs = Key.enum key in
+    let rec iter current_state path =
+      let input = BatEnum.get inputs in
+      match (node datrie current_state, input) with
+        | (None, _) ->
+          failwith "invalid state (get)"
+        | (Some { base = NextOffset _; check = _ }, None) ->
+	  path
+        | (Some { base = NextOffset _; check = _ }, Some input) ->
+          (match (walk datrie current_state input) with
+            | None ->
+              path
+            | Some next_state ->
+              iter next_state (next_state :: path))
+        | (Some { base = Value value; check = _ }, _) ->
+          path in
+    iter (State 0) [State 0]
+
+  let delete datrie key =
+    let path = path datrie key in
+    let rec iter = function
+      | [] -> failwith "invalid path"
+      | [State 0] -> ()
+      | state :: rest ->
+	(match (BatOption.get (node datrie state)) with
+	  | { base = NextOffset _; check = _ } ->
+	    if BatSet.cardinal (transitions datrie state) > 0 then
+	      ();
+	    set_node datrie state None;
+	    iter rest
+	  | { base = Value _; check = _ } ->
+	    set_node datrie state None;
+	    iter rest) in
+    iter path
+
+  (* low level operations *)
+
+  let length datrie =
+    BatDynArray.length datrie.nodes
+
+  let available_states datrie =
+    BatEnum.filter_map (fun i ->
+      match (node datrie (State i)) with
+	| None -> None
+	| Some _ -> Some i
+    ) (0 -- ((length datrie) - 1))
+
+  let is_leaf datrie i =
+    match (BatOption.get (node datrie (State i))) with
+    | { base = NextOffset _; check = _ } ->
+      false
+    | { base = Value _; check = _ } ->
+      true
+
+  let is_branch datrie i =
+    not (is_leaf datrie i)
+
+  let leaves datrie =
+    BatEnum.filter (is_leaf datrie) (available_states datrie)
+
+  let branches datrie =
+    BatEnum.filter (is_branch datrie) (available_states datrie)
+
+  let key datrie i =
+    let rec iter inputs = function
+      | State 0 ->
+	Key.of_enum (BatList.backwards inputs)
+      | (State i) as state ->
+	let prev_state = check datrie state in
+	match (base datrie prev_state) with
+	  | NextOffset (Offset o) ->
+	    let input = Key.input (i - o) in
+	    iter (input :: inputs) prev_state
+	  | Value _ ->
+	    failwith "invalid datrie"
+    in
+    iter [] (State i)
+
+  let value datrie i =
+    match (BatOption.get (node datrie (State i))) with
+      | { base = NextOffset _; check = _ } ->
+	None
+      | { base = Value value; check = _ } ->
+	Some value
 end
 
 module StringDatrie = Make(DatrieKey.StringKey)
