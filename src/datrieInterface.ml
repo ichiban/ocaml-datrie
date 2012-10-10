@@ -31,6 +31,10 @@ sig
   val delete : 'a t -> key -> unit
   (** deletes the key *)
 
+  val common_prefix_search : 'a t -> key -> (key * 'a) list
+
+  val predictive_search : 'a t -> key -> (key * 'a) list
+
   (** low level operations *)
 
   val length : 'a t -> int
