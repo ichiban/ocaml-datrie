@@ -388,42 +388,6 @@ struct
 	| _ -> ()
     ) datrie.nodes;
     !continuation []
-
-  let length datrie =
-    BatDynArray.length datrie.nodes
-
-  let available_states datrie =
-    BatEnum.filter_map (fun i ->
-      match (node datrie (State i)) with
-	| None -> None
-	| Some _ -> Some i
-    ) (0 -- ((length datrie) - 1))
-
-  let is_leaf datrie i =
-    match (BatOption.get (node datrie (State i))) with
-      | { base = NextOffset _; check = _ } ->
-	false
-      | { base = Value _; check = _ } ->
-	true
-
-  let is_branch datrie i =
-    not (is_leaf datrie i)
-
-  let leaves datrie =
-    BatEnum.filter (is_leaf datrie) (available_states datrie)
-
-  let branches datrie =
-    BatEnum.filter (is_branch datrie) (available_states datrie)
-
-  let key datrie i =
-    key_of datrie (State i)
-
-  let value datrie i =
-    match (BatOption.get (node datrie (State i))) with
-      | { base = NextOffset _; check = _ } ->
-	None
-      | { base = Value value; check = _ } ->
-	Some value
 end
 
 module StringDatrie = Make(DatrieKey.StringKey)

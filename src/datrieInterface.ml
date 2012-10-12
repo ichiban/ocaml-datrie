@@ -38,24 +38,6 @@ sig
   val lookup : 'a t -> key -> 'a option
 
   val reverse_lookup : ?cmp:('a -> 'a -> bool) -> 'a t -> 'a -> key list
-
-  (** low level operations *)
-
-  val length : 'a t -> int
-
-  val available_states : 'a t -> int BatEnum.t
-
-  val leaves : 'a t -> int BatEnum.t
-
-  val branches : 'a t -> int BatEnum.t
-
-  val is_leaf : 'a t -> int -> bool
-
-  val is_branch : 'a t -> int -> bool
-
-  val key : 'a t -> int -> key
-
-  val value : 'a t -> int -> 'a option
 end
 
 module type Key =
