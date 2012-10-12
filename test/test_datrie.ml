@@ -1,4 +1,5 @@
 open OUnit
+open BatPervasives
 open Datrie.StringDatrie
 
 let test_create () =
@@ -51,27 +52,51 @@ let test_delete () =
   delete datrie "foo";
   assert_equal None (get datrie "foo")
 
+let string_of_key_value_list = 
+  let rec iter k = function
+    | [] -> k []
+    | (key, value) :: rest ->
+      iter (fun x -> k ((Format.sprintf "(\"%s\", \"%s\")" key value) :: x)) rest in
+  iter (BatString.join "; ")
+
 let test_common_prefix_search () =
   let datrie = create () in
   set datrie "a" "det";
   set datrie "app" "noun";
   set datrie "apple" "fruit";
-  assert_equal ["a", "det"] (common_prefix_search datrie "ap");
+  assert_equal ["a", "det"] (common_prefix_search datrie "ap")
+    ~printer:string_of_key_value_list;
   assert_equal ["a", "det";
-  		"app", "noun"] (common_prefix_search datrie "appl");
+  		"app", "noun"] (common_prefix_search datrie "appl")
+    ~printer:string_of_key_value_list;
   assert_equal ["a", "det";
 		"app", "noun";
-		"apple", "fruit"] (common_prefix_search datrie "apple");
+		"apple", "fruit"] (common_prefix_search datrie "apple")
+    ~printer:string_of_key_value_list;
   assert_equal [] (common_prefix_search datrie "b")
+    ~printer:string_of_key_value_list
 
 let test_predictive_search () =
   let datrie = create () in
   set datrie "bird" "Chirp";
   set datrie "bison" "Yes!";
   set datrie "cat" "Om nom nom nom";
-  assert_equal [] (predictive_search datrie "a");
-  assert_equal ["bird", "Chirp"; "bison", "Yes!"] (predictive_search datrie "bi");
+  assert_equal [] (predictive_search datrie "a")
+    ~printer:string_of_key_value_list;
+  assert_equal ["bird", "Chirp";
+		"bison", "Yes!"] (predictive_search datrie "bi")
+    ~printer:string_of_key_value_list;
   assert_equal ["cat", "Om nom nom nom"] (predictive_search datrie "c")
+    ~printer:string_of_key_value_list
+
+let test_reverse_lookup () =
+  let datrie = create () in
+  set datrie "foo" "bar";
+  set datrie "baz" "bar";
+  set datrie "hoge" "fuga";
+  assert_equal [] (reverse_lookup datrie "cat");
+  assert_equal ["foo"; "baz"] (reverse_lookup datrie "bar");
+  assert_equal ["hoge"] (reverse_lookup datrie "fuga")
 
 let tests = "Datrie" >::: [
   "create" >:: test_create;
@@ -79,6 +104,7 @@ let tests = "Datrie" >::: [
   "add" >:: test_add;
   "update" >:: test_update;
   "delete" >:: test_delete;
-  "common_prefix_search" >:: test_common_prefix_search
-(*  "predictive_search" >:: test_predictive_search *)
+  "common_prefix_search" >:: test_common_prefix_search;
+  "predictive_search" >:: test_predictive_search;
+  "reverse_lookup" >:: test_reverse_lookup
 ]

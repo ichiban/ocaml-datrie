@@ -124,8 +124,7 @@ struct
 
   let resolve_conflict datrie prev_state input =
     let old_transitions = transitions datrie prev_state in
-    let new_transitions =
-      BatSet.add input old_transitions in
+    let new_transitions = BatSet.add input old_transitions in
     let old_offset = match (base datrie prev_state) with
       | NextOffset offset ->
         offset
@@ -137,35 +136,20 @@ struct
       let old_state = state datrie old_offset input in
       let new_state = state datrie new_offset input in
       assert (old_state != new_state);
-      set_node datrie new_state (Some {
-	(BatOption.get (node datrie old_state)) with
-          check = prev_state	  
-      });
+      set_node datrie new_state (node datrie old_state);
       BatSet.iter (fun input' ->
-	let child_state = state datrie old_offset input' in
-        match (base datrie child_state) with
-          | NextOffset offset ->
-            let s = state datrie offset input' in
-            set_node datrie s (Some {
-              (BatOption.get (node datrie s)) with
-                check = new_state
-            })
-          | Value _ ->
-            failwith "state must be a branch"
+	let child_state = BatOption.get (walk datrie old_state input') in
+        set_node datrie child_state (Some {
+          (BatOption.get (node datrie child_state)) with
+            check = new_state
+        })
       ) (transitions datrie old_state);
       set_node datrie old_state None
     ) old_transitions;
     set_node datrie prev_state (Some {
       (BatOption.get (node datrie prev_state)) with
         base = NextOffset new_offset
-    });
-    assert (BatSet.for_all (fun input ->
-      let next_state = state datrie new_offset input in
-      match (node datrie next_state) with
-	| Some { base = _; check = check } when check = next_state ->
-	  true
-	| _ -> false
-    ) (transitions datrie prev_state))
+    })
 
   let ensure_next_node ?(inserting=true) ?(updating=true) datrie current_state input base =
     let rec aux () =
@@ -353,8 +337,57 @@ struct
           k [key_of datrie current_state, value] in
     iter (State 0) identity
 
+  let all_leaves_after datrie state =
+    let queue = Queue.create () in
+    Queue.push state queue;
+    let rec iter k =
+      if Queue.is_empty queue then
+	k []
+      else
+	let current_state = Queue.pop queue in
+	match (BatOption.get (node datrie current_state)) with
+	  | { base = NextOffset _; check = _ } ->
+	    BatSet.iter (function input ->
+	      (match (walk datrie current_state input) with
+		| None -> ()
+		| Some next_state ->
+		  Queue.push next_state queue)
+	    ) (transitions datrie current_state);
+	    iter k
+	  | { base = Value value; check = prev_state } ->
+	    iter (fun x -> k ((key_of datrie prev_state, value) :: x)) in
+    iter identity
+	  
   let predictive_search datrie key =
-    []
+    let inputs = Key.enum key in
+    let rec iter current_state =
+      let input = BatEnum.get inputs in
+      match (BatOption.get (node datrie current_state), input) with
+	| ({ base = NextOffset _; check = _ }, None) ->
+	  all_leaves_after datrie current_state
+	| ({ base = NextOffset _; check = _ }, Some input) ->
+	  (match (walk datrie current_state input) with
+	    | None ->
+	      []
+	    | Some next_state ->
+	      iter next_state)
+	| ({ base = Value _; check = _ }, _) ->
+	  failwith "invalid state" in
+  iter (State 0)
+
+  let lookup datrie key = get datrie key
+
+  let reverse_lookup ?(cmp=(=)) datrie value =
+    let continuation = ref identity in
+    BatDynArray.iter (fun node ->
+      match node with
+	| Some { base = Value node_value; check = prev_state } ->
+	  if cmp value node_value then
+	    let k = !continuation in
+	    continuation := (fun x -> k ((key_of datrie prev_state) :: x))
+	| _ -> ()
+    ) datrie.nodes;
+    !continuation []
 
   let length datrie =
     BatDynArray.length datrie.nodes

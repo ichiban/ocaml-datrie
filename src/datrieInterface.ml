@@ -35,6 +35,10 @@ sig
 
   val predictive_search : 'a t -> key -> (key * 'a) list
 
+  val lookup : 'a t -> key -> 'a option
+
+  val reverse_lookup : ?cmp:('a -> 'a -> bool) -> 'a t -> 'a -> key list
+
   (** low level operations *)
 
   val length : 'a t -> int
