@@ -367,3 +367,5 @@ struct
 end
 
 module StringDatrie = Make(DatrieKey.StringKey)
+module UTF8Datrie = Make(DatrieKey.UTF8Key)
+module RopeDatrie = Make(DatrieKey.RopeKey)
