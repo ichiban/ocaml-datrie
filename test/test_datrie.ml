@@ -2,6 +2,30 @@ open OUnit
 open BatPervasives
 open Datrie.StringDatrie
 
+(* helper functions *)
+
+let string_of_value_option = function
+  | None -> "None"
+  | Some value -> Format.sprintf "Some \"%s\"" value
+
+let string_of_value_list =
+  let rec iter k = function
+    | [] -> k []
+    | value :: rest ->
+      let value = Format.sprintf "\"%s\"" value in
+      iter (fun x -> k (value :: x)) rest in
+  iter (BatString.join "; ")
+
+let string_of_key_value_list =
+  let rec iter k = function
+    | [] -> k []
+    | (key, value) :: rest ->
+      let key_value = Format.sprintf "(\"%s\", \"%s\")" key value in
+      iter (fun x -> k (key_value :: x)) rest in
+  iter (BatString.join "; ")
+
+(* tests *)
+
 let test_create () =
   try
     ignore (create ())
@@ -10,54 +34,58 @@ let test_create () =
 
 let test_set_and_get () =
   let datrie = create () in
-  assert_equal None (get datrie "foo");
+  assert_equal None (get datrie "foo")
+    ~printer:string_of_value_option;
   set datrie "foo" "bar";
-  assert_equal (Some "bar") (get datrie "foo");
+  assert_equal (Some "bar") (get datrie "foo")
+    ~printer:string_of_value_option;
   set datrie "foo" "baz";
   assert_equal (Some "baz") (get datrie "foo")
+    ~printer:string_of_value_option
 
 let test_add () =
   let datrie = create () in
-  assert_equal None (get datrie "foo");
+  assert_equal None (get datrie "foo")
+    ~printer:string_of_value_option;
   (try
      add datrie "foo" "bar"
    with InvalidState _ ->
      assert_failure "should be fail");
-  assert_equal (Some "bar") (get datrie "foo");
+  assert_equal (Some "bar") (get datrie "foo")
+    ~printer:string_of_value_option;
   (try 
      add datrie "foo" "baz";
      assert_failure "should be fail"
    with InvalidState _ -> ());
   assert_equal (Some "bar") (get datrie "foo")
+    ~printer:string_of_value_option
 
 let test_update () =
   let datrie = create () in
-  assert_equal None (get datrie "foo");
+  assert_equal None (get datrie "foo")
+    ~printer:string_of_value_option;
   (try 
     update datrie "foo" "baz";
     assert_failure "should be fail"
    with InvalidState _ -> ());
   set datrie "foo" "bar";
-  assert_equal (Some "bar") (get datrie "foo");
+  assert_equal (Some "bar") (get datrie "foo")
+    ~printer:string_of_value_option;
   (try 
     update datrie "foo" "baz";
    with InvalidState _ ->
      assert_failure "should be fail");
   assert_equal (Some "baz") (get datrie "foo")
+    ~printer:string_of_value_option
 
 let test_delete () =
   let datrie = create () in
   set datrie "foo" "bar";
-  assert_equal (Some "bar") (get datrie "foo");
+  assert_equal (Some "bar") (get datrie "foo")
+    ~printer:string_of_value_option;
   delete datrie "foo";
   assert_equal None (get datrie "foo")
-
-let string_of_key_value_list = 
-  let rec iter k = function
-    | [] -> k []
-    | (key, value) :: rest ->
-      iter (fun x -> k ((Format.sprintf "(\"%s\", \"%s\")" key value) :: x)) rest in
-  iter (BatString.join "; ")
+    ~printer:string_of_value_option
 
 let test_common_prefix_search () =
   let datrie = create () in
@@ -94,9 +122,12 @@ let test_reverse_lookup () =
   set datrie "foo" "bar";
   set datrie "baz" "bar";
   set datrie "hoge" "fuga";
-  assert_equal [] (reverse_lookup datrie "cat");
-  assert_equal ["foo"; "baz"] (reverse_lookup datrie "bar");
+  assert_equal [] (reverse_lookup datrie "cat")
+    ~printer:string_of_value_list;
+  assert_equal ["foo"; "baz"] (reverse_lookup datrie "bar")
+    ~printer:string_of_value_list;
   assert_equal ["hoge"] (reverse_lookup datrie "fuga")
+    ~printer:string_of_value_list
 
 let tests = "Datrie" >::: [
   "create" >:: test_create;
