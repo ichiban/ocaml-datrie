@@ -50,3 +50,20 @@ struct
 
   let input = Char.chr
 end
+
+module EnumKey =
+struct
+  type t = Char.t BatEnum.t
+
+  type input = Char.t
+
+  let enum = identity
+
+  let of_enum = identity
+
+  let all = BatChar.enum |- BatSet.of_enum
+
+  let code = Char.code
+
+  let input = Char.chr
+end
