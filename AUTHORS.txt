@@ -1,5 +1,0 @@
-(* OASIS_START *)
-(* DO NOT EDIT (digest: 31aaee57b192fae1a26a304a0aacb5da) *)
-Authors of Datrie
-1ban
-(* OASIS_STOP *)
